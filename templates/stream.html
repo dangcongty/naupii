@@ -1,77 +1,126 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Camera Stream</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: black;
-        }
-        #video {
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
-        }
-        #captureBtn {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            padding: 15px 25px;
-            font-size: 20px;
-            background: #ff5722;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-        }
-        #result {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            max-width: 300px;
-            border: 3px solid white;
-        }
-    </style>
+<title>Camera Stream</title>
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+    font-family: Arial;
+}
+#video {
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+}
+#captureBtn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 18px 32px;
+    font-size: 22px;
+    font-weight: bold;
+    background: #ff5722;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0px 0px 18px rgba(255, 87, 34, 0.6);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+#captureBtn:disabled {
+    background: #999;
+    cursor: not-allowed;
+}
+#resultBox {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    display: none;
+    max-width: 320px;
+    font-size: 15px;
+    box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
+}
+#closeResult {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #ff5722;
+    border: none;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
 </head>
 <body>
+<img id="video" src="/video_feed">
+<button id="captureBtn">Capture</button>
+<div id="resultBox">
+    <button id="closeResult">✕</button>
+    <div id="resultContent"></div>
+</div>
 
-    <!-- Full screen stream -->
-    <img id="video" src="/video_feed">
+<script>
+const captureBtn = document.getElementById("captureBtn");
+const resultBox = document.getElementById("resultBox");
+const resultContent = document.getElementById("resultContent");
+const closeResult = document.getElementById("closeResult");
 
-    <!-- Capture button -->
-    <button id="captureBtn">Capture</button>
-
-    <!-- Result image -->
-    <img id="result" style="display:none">
-
-    <script>
-        document.getElementById("captureBtn").addEventListener("click", function () {
-            let btn = this;
-            btn.disabled = true;
-            btn.innerText = "Processing...";
-
-            fetch("/capture", {
-                method: "POST"
-            })
-            .then(response => response.blob())
-            .then(blob => {
-                const url = URL.createObjectURL(blob);
-                const result = document.getElementById("result");
-                result.src = url;
-                result.style.display = "block";
-
-                btn.disabled = false;
-                btn.innerText = "Capture";
-            })
-            .catch(err => {
-                alert("Error capturing image!");
-                btn.disabled = false;
-                btn.innerText = "Capture";
-            });
+captureBtn.addEventListener("click", function () {
+    captureBtn.disabled = true;
+    captureBtn.innerHTML = '<span class="loading"></span> Processing...';
+    
+    fetch("/capture", { method: "POST" })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => Promise.reject(err));
+            }
+            return res.json();
+        })
+        .then(data => {
+            captureBtn.disabled = false;
+            captureBtn.innerHTML = "Capture";
+            
+            if (data.success) {
+                // Hiển thị kết quả từ backend
+                resultContent.innerHTML = `
+                    <h3 style="margin-top:0">Processing Complete</h3>
+                    <pre style="background:#222; padding:10px; border-radius:5px; overflow:auto; max-height:300px">${JSON.stringify(data.result, null, 2)}</pre>
+                `;
+                resultBox.style.display = "block";
+            } else {
+                alert("Error: " + (data.error || "Unknown error"));
+            }
+        })
+        .catch(err => {
+            captureBtn.disabled = false;
+            captureBtn.innerHTML = "Capture";
+            alert("Error: " + (err.error || err.message || "Connection failed"));
         });
-    </script>
+});
 
+closeResult.addEventListener("click", function() {
+    resultBox.style.display = "none";
+});
+</script>
 </body>
 </html>

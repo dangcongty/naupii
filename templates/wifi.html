@@ -1,34 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>WiFi Login</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect WiFi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 450px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+            font-size: 28px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        select, input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            background: white;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            padding-right: 40px;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 10px;
+            color: #667eea;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <h2>Select WiFi</h2>
+    <div class="container">
+        <h1>🌐 Connect WiFi</h1>
+        
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
 
-    {% if error %}
-        <p style="color:red">{{ error }}</p>
-    {% endif %}
+        {% if saved_ssid %}
+        <div class="info">Last connected: <strong>{{ saved_ssid }}</strong></div>
+        {% endif %}
 
-    <form method="POST">
-        <label>WiFi name:</label><br>
-            <select name="ssid" required>
-                {% for s in ssid_list %}
-                    {% if saved_ssid == s %}
-                        <option value="{{ s }}" selected>{{ s }}</option>
-                    {% else %}
-                        <option value="{{ s }}">{{ s }}</option>
-                    {% endif %}
-                {% endfor %}
-            </select>
+        <form method="POST" id="wifiForm">
+            <div class="form-group">
+                <label for="ssid">WiFi name:</label>
+                <select name="ssid" id="ssid" required>
+                    <option value="">-- Select WiFi Network --</option>
+                    {% for wifi in ssid_list %}
+                    <option value="{{ wifi }}" {% if wifi == saved_ssid %}selected{% endif %}>
+                        {{ wifi }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
 
-        <br><br>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" name="password" id="password" 
+                       placeholder="Enter WiFi password" required>
+            </div>
 
-        <label>Password:</label><br>
-        <input type="password" name="password" required>
+            <button type="submit" class="btn">Connect</button>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                Connecting...
+            </div>
+        </form>
+    </div>
 
-        <br><br>
-        <button type="submit">Connect</button>
-    </form>
+    <script>
+        document.getElementById('wifiForm').addEventListener('submit', function() {
+            document.getElementById('loading').style.display = 'block';
+        });
+    </script>
 </body>
 </html>

@@ -3,7 +3,8 @@ import os
 import subprocess
 import tempfile
 import time
-
+import numpy as np
+import requests
 import cv2
 from flask import (
     Flask,
@@ -16,6 +17,10 @@ from flask import (
 )
 
 CONFIG_FILE = "wifi_config.json"
+BACKEND_URL = "http://118.69.83.17:9000/api/process" 
+
+# ========== MOCK MODE (để test trên server) ==========
+MOCK_MODE = os.environ.get("MOCK_MODE", "false").lower() == "true"
 
 app = Flask(__name__)
 
@@ -67,9 +72,6 @@ def connect_wifi(ssid, password):
     except:
         return False
 
-# ---------------------------
-# Routes
-# ---------------------------
 def scan_wifi_list():
     """Return list of available SSIDs."""
     try:
@@ -83,10 +85,16 @@ def scan_wifi_list():
         return sorted(list(set(ssids)))
     except:
         return []
-    
+
+# ---------------------------
+# Routes
+# ---------------------------
+#  
+
 @app.route("/", methods=["GET", "POST"])
 def wifi_page():
     ssid_list = scan_wifi_list()
+    print(f"DEBUG: Found {len(ssid_list)} networks: {ssid_list}") 
     saved_ssid, saved_password = load_wifi_config()
     current_ssid = get_current_ssid()
 
@@ -129,35 +137,55 @@ def stream_page():
 # ---------------------------
 # MJPEG video generator
 # ---------------------------
-camera = cv2.VideoCapture(0)   # dùng chung cho stream + capture
-latest_frame = None            # lưu frame mới nhất từ stream
+if MOCK_MODE:
+    print("[MOCK] Using fake camera (no /dev/video0)")
+    camera = None
+else:
+    camera = cv2.VideoCapture(0)
+
+latest_frame = None
 
 
 def gen_frames():
     global latest_frame, camera
 
     while True:
-        success, frame = camera.read()
-        if not success:
-            break
+        if MOCK_MODE:
+            # Tạo fake frame (gradient màu)
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            frame[:, :, 0] = np.linspace(0, 255, 640, dtype=np.uint8)  # Blue gradient
+            frame[:, :, 1] = 128  # Green
+            frame[:, :, 2] = np.linspace(255, 0, 640, dtype=np.uint8)  # Red gradient
+            
+            # Thêm text timestamp
+            timestamp = time.strftime("%H:%M:%S")
+            cv2.putText(frame, f"MOCK CAMERA - {timestamp}", (50, 240),
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+            
+            latest_frame = frame.copy()
+            time.sleep(0.03)  # ~30 FPS
+        else:
+            success, frame = camera.read()
+            if not success:
+                break
+            latest_frame = frame.copy()
 
-        latest_frame = frame.copy()   # Lưu frame hiện tại
-
-        ret, buffer = cv2.imencode('.jpg', frame)
+        ret, buffer = cv2.imencode('.jpg', latest_frame)
         frame_bytes = buffer.tobytes()
 
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
 
-
 @app.route("/video_feed")
 def video_feed():
     return Response(gen_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
+
 # -----------------------------------
 # PROCESS CAPTURE API
 # -----------------------------------
+
 @app.route("/capture", methods=["POST"])
 def capture():
     global latest_frame
@@ -165,17 +193,36 @@ def capture():
     if latest_frame is None:
         return jsonify({"error": "No frame available"}), 500
 
-    # ----  fake processing (3 seconds) ----
-    time.sleep(3)
-
-    # ---- save temp image ----
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-    cv2.imwrite(temp_file.name, latest_frame)
-
-    return send_file(temp_file.name, mimetype='image/jpeg')
+    try:
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        cv2.imwrite(temp_file.name, latest_frame)
+        
+        with open(temp_file.name, 'rb') as f:
+            files = {'file': ('capture.jpg', f, 'image/jpeg')}
+            response = requests.post(BACKEND_URL, files=files, timeout=30)
+        
+        os.unlink(temp_file.name)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify({
+                "success": True,
+                "result": result
+            })
+        else:
+            return jsonify({"error": "Backend processing failed"}), 500
+            
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Cannot connect to backend: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ---------------------------
 # Run
 # ---------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=False)
+    if MOCK_MODE:
+        print("\n" + "="*50)
+        print("🧪 RUNNING IN MOCK MODE (for testing on server)")
+        print("="*50 + "\n")
+    app.run(host="0.0.0.0", port=7000, debug=False)
