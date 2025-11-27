@@ -3,16 +3,16 @@
 <head>
 <title>Camera Stream</title>
 <style>
-body {
+body, html {
     margin: 0;
+    padding: 0;
     overflow: hidden;
     background: black;
-    font-family: Arial;
 }
 #video {
     width: 100vw;
     height: 100vh;
-    object-fit: cover;
+    object-fit: contain;  /* Thay đổi từ 'cover' sang 'contain' */
 }
 #captureBtn {
     position: fixed;
@@ -29,22 +29,30 @@ body {
     cursor: pointer;
     transition: all 0.3s;
 }
+#captureBtn:hover {
+    background: #e64a19;
+    transform: scale(1.05);
+}
 #captureBtn:disabled {
     background: #999;
     cursor: not-allowed;
+    transform: scale(1);
 }
 #resultBox {
     position: fixed;
     top: 20px;
     right: 20px;
-    background: rgba(0,0,0,0.85);
+    background: rgba(0,0,0,0.9);
     color: white;
     padding: 20px;
     border-radius: 12px;
     display: none;
-    max-width: 320px;
-    font-size: 15px;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+    font-size: 14px;
     box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
+    z-index: 200;
 }
 #closeResult {
     position: absolute;
@@ -53,9 +61,14 @@ body {
     background: #ff5722;
     border: none;
     color: white;
-    padding: 5px 10px;
+    padding: 5px 12px;
     border-radius: 5px;
     cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+}
+#closeResult:hover {
+    background: #e64a19;
 }
 .loading {
     display: inline-block;
@@ -72,8 +85,13 @@ body {
 </style>
 </head>
 <body>
+<!-- Full screen stream -->
 <img id="video" src="/video_feed">
-<button id="captureBtn">Capture</button>
+
+<!-- Capture button -->
+<button id="captureBtn">📸 Capture</button>
+
+<!-- Result box -->
 <div id="resultBox">
     <button id="closeResult">✕</button>
     <div id="resultContent"></div>
@@ -98,13 +116,13 @@ captureBtn.addEventListener("click", function () {
         })
         .then(data => {
             captureBtn.disabled = false;
-            captureBtn.innerHTML = "Capture";
+            captureBtn.innerHTML = "📸 Capture";
             
             if (data.success) {
                 // Hiển thị kết quả từ backend
                 resultContent.innerHTML = `
-                    <h3 style="margin-top:0">Processing Complete</h3>
-                    <pre style="background:#222; padding:10px; border-radius:5px; overflow:auto; max-height:300px">${JSON.stringify(data.result, null, 2)}</pre>
+                    <h3 style="margin-top:0; padding-right:30px">✅ Processing Complete</h3>
+                    <pre style="background:#222; padding:10px; border-radius:5px; overflow:auto; max-height:400px; font-size:12px">${JSON.stringify(data.result, null, 2)}</pre>
                 `;
                 resultBox.style.display = "block";
             } else {
@@ -113,7 +131,7 @@ captureBtn.addEventListener("click", function () {
         })
         .catch(err => {
             captureBtn.disabled = false;
-            captureBtn.innerHTML = "Capture";
+            captureBtn.innerHTML = "📸 Capture";
             alert("Error: " + (err.error || err.message || "Connection failed"));
         });
 });
